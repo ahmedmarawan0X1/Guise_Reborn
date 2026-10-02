@@ -52,7 +52,15 @@ class HookInit : XposedModule() {
             this,
             LoadPackageContext(param.packageName, processName, param.classLoader),
         )
-        ModernXposedPreferences.current = getRemotePreferences(PackageConfig.PREF_FILE_NAME)
+        // If the framework's remote-preferences service is unavailable or throws,
+        // every hook would silently stay disabled. Surface the failure in the
+        // framework log instead of dying without a trace.
+        ModernXposedPreferences.current = runCatching {
+            getRemotePreferences(PackageConfig.PREF_FILE_NAME)
+        }.getOrElse {
+            Log.e(TAG, "Remote preferences unavailable in $processName; hooks disabled", it)
+            return
+        }
         PackageConfig.doRefresh(param.packageName)
         if (!PackageConfig.current.isEnable) return
 
