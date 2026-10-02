@@ -7,7 +7,7 @@ inline fun <reified T> setStaticField(className: String, fieldName: String, valu
 }
 
 inline fun <reified T> Class<*>.setStaticField(fieldName: String, value: T) {
-    runXposedCatching { findField(fieldName).set(null, value) }
+    runXposedCatching { StaticFieldWriter.write(findField(fieldName), value) }
 }
 
 inline fun <reified T> setInstanceField(instance: Any, fieldName: String, value: T) {
