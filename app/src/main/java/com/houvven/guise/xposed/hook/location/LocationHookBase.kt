@@ -19,6 +19,7 @@ import android.telephony.TelephonyManager
 import android.telephony.TelephonyManager.INCLUDE_LOCATION_DATA_NONE
 import android.telephony.cdma.CdmaCellLocation
 import android.telephony.gsm.GsmCellLocation
+import com.houvven.ktx_xposed.hook.afterHookedMethod
 import com.houvven.ktx_xposed.hook.beforeHookedMethod
 import com.houvven.ktx_xposed.hook.findMethodExactIfExists
 import com.houvven.ktx_xposed.hook.setMethodResult
@@ -56,8 +57,10 @@ open class LocationHookBase {
 
     protected fun makeWifiLocationFail() {
         WifiManager::class.java.run {
-            setMethodResult("getScanResults", emptyList<ScanResult>())
+            desensitizeScanResults()
             setMethodResult("isScanAlwaysAvailable", false)
+            setMethodResult("isWifiEnabled", false)
+            setMethodResult("getWifiState", WifiManager.WIFI_STATE_DISABLED)
         }
         WifiInfo::class.java.run {
             setMethodResult("getSSID", WifiManager.UNKNOWN_SSID)
@@ -115,11 +118,28 @@ open class LocationHookBase {
 
     private fun Class<*>.requestLocationFreeServiceState() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        // TelephonyManager#getServiceState(int) only exists on API 35+; looking it up
+        // unconditionally throws NoSuchMethodException on older releases.
+        findMethodExactIfExists("getServiceState", Int::class.javaPrimitiveType!!) ?: return
         beforeHookedMethod(
             "getServiceState",
             Int::class.javaPrimitiveType!!,
         ) { param ->
             param.args[0] = INCLUDE_LOCATION_DATA_NONE
+        }
+    }
+
+    /**
+     * Hides the nearby-AP list, which is what "hide Wi-Fi location info" promises.
+     *
+     * An empty list does deny Wi-Fi triangulation outright — that is the point of the
+     * switch. It is safe to be this strict only because [LocationHook] no longer waits
+     * for the system to produce a fix: it pushes the spoofed coordinate into the app's
+     * listeners itself, so removing every real fix source costs the app nothing.
+     */
+    private fun Class<*>.desensitizeScanResults() {
+        afterHookedMethod("getScanResults") { param ->
+            param.result = emptyList<ScanResult>()
         }
     }
 
