@@ -59,7 +59,12 @@ class LocationHook : LoadPackageHandler, LocationHookBase() {
     // Pretend a healthy GPS constellation is being tracked. Apps that gate on "are there
     // any satellites?" before trusting a fix would otherwise reject the spoofed location.
     private val svCount = 5
-    private val svidWithFlags = intArrayOf(1, 2, 3, 4, 5)
+    private val satelliteIds = intArrayOf(1, 2, 3, 4, 5)
+    private val svidWithFlags = satelliteIds.map { svid ->
+        (svid shl SVID_SHIFT_WIDTH) or
+            (GnssStatus.CONSTELLATION_GPS shl CONSTELLATION_TYPE_SHIFT_WIDTH) or
+            SVID_FLAGS_FULLY_USABLE
+    }.toIntArray()
     private val cn0s = floatArrayOf(0F, 0F, 0F, 0F, 0F)
     private val elevations = cn0s.clone()
     private val azimuths = cn0s.clone()
@@ -430,7 +435,7 @@ class LocationHook : LoadPackageHandler, LocationHookBase() {
                     // Only the 12-arg overload exists on current SDKs; the has* flags
                     // (carrier frequency, baseband C/N0) stay false like the original.
                     addSatellite(
-                        svidWithFlags[index],
+                        satelliteIds[index],
                         GnssStatus.CONSTELLATION_GPS,
                         cn0s[index],
                         elevations[index],
@@ -523,6 +528,11 @@ class LocationHook : LoadPackageHandler, LocationHookBase() {
     private fun log(message: String) = XposedLogger.i(message, CATEGORY)
 
     private companion object {
+        // Hidden GnssStatus constructors take packed values; Builder takes raw SVIDs.
+        const val SVID_SHIFT_WIDTH = 12
+        const val CONSTELLATION_TYPE_SHIFT_WIDTH = 8
+        const val SVID_FLAGS_FULLY_USABLE = 0b111
+
         const val CATEGORY = "Location"
         const val UNSET_COORDINATE = -1.0
         const val FAKE_ACCURACY_METERS = 10.0f
