@@ -27,6 +27,7 @@ import com.houvven.ktx_xposed.hook.setAllMethodResult
 import com.houvven.ktx_xposed.hook.setMethodResult
 import com.houvven.ktx_xposed.hook.setSomeSameNameMethodResult
 import com.houvven.ktx_xposed.logger.XposedLogger
+import java.lang.reflect.Constructor
 import java.util.Collections
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
@@ -62,8 +63,6 @@ class LocationHook : LoadPackageHandler, LocationHookBase() {
     private val cn0s = floatArrayOf(0F, 0F, 0F, 0F, 0F)
     private val elevations = cn0s.clone()
     private val azimuths = cn0s.clone()
-    private val carrierFrequencies = cn0s.clone()
-    private val basebandCn0DbHzs = cn0s.clone()
 
     /** Listener classes whose delivery methods have already been hooked. */
     private val hookedListenerClasses =
@@ -353,8 +352,9 @@ class LocationHook : LoadPackageHandler, LocationHookBase() {
     /**
      * Makes GNSS report a healthy constellation instead of the real (now contradictory)
      * satellite data, and actively fires the "GPS started / first fix" events some apps
-     * wait for. Mirrors the original Guise GNSS handling. Best-effort: constructor and
-     * method signatures vary across releases, and any mismatch degrades silently.
+     * wait for. Mirrors the original Guise GNSS handling. The hidden constructor's
+     * signature varies across releases and is discovered at runtime; any mismatch in
+     * the remaining hooks degrades silently.
      */
     private fun fakeGnssSatellites() {
         LocationManager::class.java.setAllMethodResult("addNmeaListener", false)
@@ -363,24 +363,89 @@ class LocationHook : LoadPackageHandler, LocationHookBase() {
         hookGpsStatusListener()
     }
 
+    /**
+     * The data-bearing GnssStatus constructor is hidden, and its signature drifts between
+     * releases (7 args through Android 16; Android 17 dropped that one entirely). Calling
+     * beforeHookConstructor with a hard-coded signature makes the constructor lookup
+     * inside it throw NoSuchMethodException the moment a release changes it, so discover
+     * the constructor instead: it is the declared constructor that starts with the
+     * satellite count (int) and carries the most parameters.
+     */
+    @Volatile
+    private var gnssConstructor: Constructor<*>? = null
+
     private fun hookGnssStatusConstructor() {
-        GnssStatus::class.java.beforeHookConstructor(
-            Int::class.javaPrimitiveType!!,
-            IntArray::class.java,
-            FloatArray::class.java,
-            FloatArray::class.java,
-            FloatArray::class.java,
-            FloatArray::class.java,
-            FloatArray::class.java,
-        ) { param ->
-            param.args[0] = svCount
-            param.args[1] = svidWithFlags
-            param.args[2] = cn0s
-            param.args[3] = elevations
-            param.args[4] = azimuths
-            param.args[5] = carrierFrequencies
-            param.args[6] = basebandCn0DbHzs
+        val ctor = GnssStatus::class.java.declaredConstructors
+            .filter { it.parameterTypes.firstOrNull() == Int::class.javaPrimitiveType }
+            .maxByOrNull { it.parameterTypes.size }
+        if (ctor == null) {
+            // Exotic build with no data-bearing constructor: the public Builder path in
+            // buildGnssStatus() still covers the getGpsStatus() injection.
+            log("No data-bearing GnssStatus constructor found, skipping constructor hook")
+            return
         }
+        gnssConstructor = ctor
+        log("Hooking GnssStatus constructor ${ctor.parameterTypes.joinToString { it.simpleName }}")
+        GnssStatus::class.java.beforeHookConstructor(*ctor.parameterTypes) { param ->
+            fillFakeConstellation(param.args, ctor.parameterTypes)
+        }
+    }
+
+    /**
+     * Fills a GnssStatus constructor's arguments by type: the leading int is the satellite
+     * count, every trailing array is sized to match. Mirrors the original Guise's five
+     * fake SVs — zero signal strengths, fully usable flags.
+     */
+    private fun fillFakeConstellation(args: Array<Any?>, types: Array<out Class<*>>) {
+        types.forEachIndexed { index, type ->
+            val fake: Any? = when {
+                index == 0 -> svCount
+                type == IntArray::class.java -> svidWithFlags
+                type == FloatArray::class.java -> FloatArray(svCount)
+                type == BooleanArray::class.java -> BooleanArray(svCount) { true }
+                else -> null
+            }
+            if (fake != null) args[index] = fake
+        }
+    }
+
+    private fun buildGnssStatus(): GnssStatus? {
+        gnssConstructor?.let { ctor ->
+            val args = arrayOfNulls<Any?>(ctor.parameterTypes.size)
+            fillFakeConstellation(args, ctor.parameterTypes)
+            runCatching {
+                ctor.apply { isAccessible = true }.newInstance(*args) as GnssStatus
+            }.getOrNull()?.let { return it }
+        }
+        return buildGnssStatusWithBuilder()
+    }
+
+    /** Public-API fallback (API 30+), used when no data-bearing constructor was found. */
+    @android.annotation.SuppressLint("NewApi")
+    private fun buildGnssStatusWithBuilder(): GnssStatus? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        return runCatching {
+            GnssStatus.Builder().apply {
+                for (index in 0 until svCount) {
+                    // Only the 12-arg overload exists on current SDKs; the has* flags
+                    // (carrier frequency, baseband C/N0) stay false like the original.
+                    addSatellite(
+                        svidWithFlags[index],
+                        GnssStatus.CONSTELLATION_GPS,
+                        cn0s[index],
+                        elevations[index],
+                        azimuths[index],
+                        true,
+                        true,
+                        true,
+                        false,
+                        0F,
+                        false,
+                        0F,
+                    )
+                }
+            }.build()
+        }.getOrNull()
     }
 
     private fun hookGpsStatusListener() {
@@ -404,22 +469,7 @@ class LocationHook : LoadPackageHandler, LocationHookBase() {
             GpsStatus::class.java.findMethodExactIfExists(
                 "setStatus", GnssStatus::class.java, Int::class.javaPrimitiveType!!,
             ) ?: return@beforeHookedMethod
-            val gnss = GnssStatus::class.java.let { gnssClass ->
-                runCatching {
-                    gnssClass.getDeclaredConstructor(
-                        Int::class.javaPrimitiveType!!,
-                        IntArray::class.java,
-                        FloatArray::class.java,
-                        FloatArray::class.java,
-                        FloatArray::class.java,
-                        FloatArray::class.java,
-                        FloatArray::class.java,
-                    ).apply { isAccessible = true }.newInstance(
-                        svCount, svidWithFlags, cn0s, elevations,
-                        azimuths, carrierFrequencies, basebandCn0DbHzs,
-                    )
-                }.getOrNull()
-            } ?: return@beforeHookedMethod
+            val gnss = buildGnssStatus() ?: return@beforeHookedMethod
             status.callMethod("setStatus", gnss, System.currentTimeMillis().toInt())
             param.result = status
         }
