@@ -5,6 +5,7 @@ import com.houvven.guise.xposed.LoadPackageHandler
 import com.houvven.ktx_xposed.hook.beforeHookAllMethods
 import com.houvven.ktx_xposed.hook.findClass
 import com.houvven.ktx_xposed.hook.setStaticField
+import com.houvven.ktx_xposed.logger.XposedLogger
 import com.houvven.ktx_xposed.utils.runXposedCatching
 
 class OsBuildHook : LoadPackageHandler {
@@ -36,8 +37,17 @@ class OsBuildHook : LoadPackageHandler {
                 fakedProps["ro.build.version.release"] = androidVersion
             }
             if (sdkInt != -1) {
-                Build.VERSION::class.java.setStaticField<Any>("SDK_INT", sdkInt)
-                fakedProps["ro.build.version.sdk"] = sdkInt.toString()
+                if (sdkInt < Build.VERSION.SDK_INT) {
+                    // Spoofing SDK_INT below the real level makes apps take legacy
+                    // branches (e.g. skipping RECEIVER_EXPORTED flags) while the
+                    // framework still enforces current rules -> startup crashes.
+                    XposedLogger.i(
+                        "OSBuild: skip SDK_INT spoof $sdkInt < real ${Build.VERSION.SDK_INT}"
+                    )
+                } else {
+                    Build.VERSION::class.java.setStaticField<Any>("SDK_INT", sdkInt)
+                    fakedProps["ro.build.version.sdk"] = sdkInt.toString()
+                }
             }
         }
 
