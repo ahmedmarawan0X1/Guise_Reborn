@@ -8,6 +8,18 @@ import org.junit.Test
 
 class AppUpdaterTest {
     @Test
+    fun explicitPrereleaseChannelWorksWithoutVersionSuffix() {
+        assertEquals(
+            listOf("latest-prerelease.json", "latest-release.json"),
+            updateManifestNames("2.1.2", prerelease = true),
+        )
+        assertEquals(
+            listOf("latest-release.json"),
+            updateManifestNames("2.1.2", prerelease = false),
+        )
+    }
+
+    @Test
     fun prereleaseBuildChecksBothChannels() {
         assertEquals(
             listOf("latest-prerelease.json", "latest-release.json"),

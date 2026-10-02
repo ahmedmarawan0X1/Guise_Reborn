@@ -34,8 +34,8 @@ data class UpdateDownloadProgress(
 private const val RELEASE_MANIFEST = "latest-release.json"
 private const val PRERELEASE_MANIFEST = "latest-prerelease.json"
 
-internal fun updateManifestNames(versionName: String): List<String> =
-    if ('-' in versionName) {
+internal fun updateManifestNames(versionName: String, prerelease: Boolean = '-' in versionName): List<String> =
+    if (prerelease) {
         listOf(PRERELEASE_MANIFEST, RELEASE_MANIFEST)
     } else {
         listOf(RELEASE_MANIFEST)
@@ -55,7 +55,7 @@ internal fun validateUpdateChannel(actualPrerelease: Boolean?, expectedPrereleas
 class AppUpdater {
     suspend fun check(): UpdateInfo = withContext(Dispatchers.IO) {
         coroutineScope {
-            val attempts = updateManifestNames(BuildConfig.VERSION_NAME).map { manifestName ->
+            val attempts = updateManifestNames(BuildConfig.VERSION_NAME, BuildConfig.IS_PRERELEASE).map { manifestName ->
                 async { runCatching { fetchManifest(manifestName) } }
             }
             val results = attempts.awaitAll()
