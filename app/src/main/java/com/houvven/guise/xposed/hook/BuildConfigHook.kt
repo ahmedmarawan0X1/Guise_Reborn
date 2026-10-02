@@ -8,11 +8,25 @@ import com.houvven.guise.xposed.LoadPackageHandler
 import com.houvven.ktx_xposed.hook.afterHookedMethod
 import com.houvven.ktx_xposed.hook.findClassIfExists
 import com.houvven.ktx_xposed.hook.lppram
+import com.houvven.ktx_xposed.hook.setStaticField
+import com.houvven.ktx_xposed.logger.XposedLogger
 
 class BuildConfigHook : LoadPackageHandler {
 
     override fun onHook() {
         if (config.versionName.isBlank() && config.versionCode == -1) return
+
+        // Apps reading their own BuildConfig.VERSION_NAME/VERSION_CODE bypass PackageManager,
+        // so the fields must be rewritten as well (original Guise v1 behavior).
+        // StaticFieldWriter underneath handles static final fields on modern ART.
+        findClassIfExists("${lppram.packageName}.BuildConfig")?.let { buildConfigClass ->
+            if (config.versionCode != -1) {
+                buildConfigClass.setStaticField("VERSION_CODE", config.versionCode)
+            }
+            if (config.versionName.isNotBlank()) {
+                buildConfigClass.setStaticField("VERSION_NAME", config.versionName)
+            }
+        } ?: XposedLogger.i("BuildConfigHook: ${lppram.packageName}.BuildConfig not found.")
 
         val packageManagerClass = findClassIfExists("android.app.ApplicationPackageManager")
             ?: PackageManager::class.java
