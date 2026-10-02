@@ -126,10 +126,13 @@ internal object StaticFieldWriter {
         val accessFlags = accessFlagsField ?: return false
         return runCatching {
             val original = accessFlags.getInt(field)
-            accessFlags.setInt(field, original and Modifier.FINAL.inv())
-            field.isAccessible = true
-            field.set(null, value)
-            accessFlags.setInt(field, original)
+            try {
+                accessFlags.setInt(field, original and Modifier.FINAL.inv())
+                field.isAccessible = true
+                field.set(null, value)
+            } finally {
+                accessFlags.setInt(field, original)
+            }
         }.isSuccess
     }
 
