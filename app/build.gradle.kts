@@ -22,7 +22,7 @@ android {
         versionName = providers.gradleProperty("versionNameOverride").orNull
             ?: versionConfig["versionName"].toString()
 
-        val prerelease = versionConfig.getProperty("prerelease")?.toBooleanStrict()
+        val prerelease = versionConfig["prerelease"]?.toString()?.toBooleanStrict()
             ?: versionName.orEmpty().contains('-')
         buildConfigField("boolean", "IS_PRERELEASE", prerelease.toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
