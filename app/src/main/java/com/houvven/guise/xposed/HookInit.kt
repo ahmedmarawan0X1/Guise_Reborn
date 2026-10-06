@@ -12,6 +12,7 @@ import com.houvven.guise.xposed.hook.BuildConfigHook
 import com.houvven.guise.xposed.hook.DisplayDensityHook
 import com.houvven.guise.xposed.hook.LocalHook
 import com.houvven.guise.xposed.hook.OsBuildHook
+import com.houvven.guise.xposed.hook.PrivacyGuardHook
 import com.houvven.guise.xposed.hook.ScreenshotsHook
 import com.houvven.guise.xposed.hook.TimeZoneHook
 import com.houvven.guise.xposed.hook.UniquelyIdHook
@@ -96,6 +97,7 @@ class HookInit : XposedModule() {
             HookFeature.BLANK_PASS -> "BlankPass" to BlankPass()
             HookFeature.APPLICATION_LIST -> "ApplicationList" to ApplicationListPass()
             HookFeature.APP_VERSION -> "AppVersion" to BuildConfigHook()
+            HookFeature.PRIVACY_GUARD -> "PrivacyGuard" to PrivacyGuardHook()
         }
 
     /** Obtains an application context without modifying Application or Activity lifecycle methods. */
