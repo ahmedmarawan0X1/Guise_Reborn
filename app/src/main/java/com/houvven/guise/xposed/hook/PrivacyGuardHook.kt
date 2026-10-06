@@ -1,6 +1,5 @@
 package com.houvven.guise.xposed.hook
 
-import android.app.Application
 import android.content.ContentProviderClient
 import android.content.ContentResolver
 import android.database.MatrixCursor
@@ -12,10 +11,8 @@ import com.houvven.guise.xposed.LoadPackageHandler
 import com.houvven.ktx_xposed.hook.ModernXposedRuntime
 import com.houvven.ktx_xposed.hook.beforeHookConstructor
 import com.houvven.ktx_xposed.hook.beforeHookAllMethods
-import io.github.libxposed.api.XposedInterface
 import java.io.File
 import java.io.FileNotFoundException
-import java.lang.reflect.Executable
 
 /**
  * PrivacyGuard-derived privacy filtering layer integrated into Guise.
