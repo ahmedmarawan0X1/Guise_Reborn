@@ -54,6 +54,12 @@ class ModuleConfigState private constructor(moduleConfig: ModuleConfig) {
     val passVideo = mutableStateOf(moduleConfig.passVideo)
     val passAudio = mutableStateOf(moduleConfig.passAudio)
     val passApplications = mutableStateOf(moduleConfig.passApplications)
+    val privacyBlockMedia = mutableStateOf(moduleConfig.privacyBlockMedia)
+    val privacyBlockCallLogs = mutableStateOf(moduleConfig.privacyBlockCallLogs)
+    val privacyBlockSms = mutableStateOf(moduleConfig.privacyBlockSms)
+    val privacyBlockMms = mutableStateOf(moduleConfig.privacyBlockMms)
+    val privacyBlockFiles = mutableStateOf(moduleConfig.privacyBlockFiles)
+    val privacyBlockedPaths = mutableStateOf(moduleConfig.privacyBlockedPaths.joinToString("\n"))
 
     internal fun clear() {
         stringStates.forEach { it.value = "" }
@@ -67,13 +73,14 @@ class ModuleConfigState private constructor(moduleConfig: ModuleConfig) {
             fingerPrint,
             networkType, wifiSSID, wifiBSSID, wifiMacAddress, simOperator, simOperatorName,
             simCountry, imei, phoneNum, androidId, lac, cid, longitude, latitude, versionCode,
-            versionName, batteryLevel, language, timeZone,
+            versionName, batteryLevel, language, timeZone, privacyBlockedPaths,
         )
 
     private val booleanStates: List<MutableState<Boolean>>
         get() = listOf(
             randomOffset, makeWifiLocationFail, makeCellLocationFail,
             allowForceScreenshots, passContacts, passPhoto, passVideo, passAudio, passApplications,
+            privacyBlockMedia, privacyBlockCallLogs, privacyBlockSms, privacyBlockMms, privacyBlockFiles,
         )
 
     companion object {
