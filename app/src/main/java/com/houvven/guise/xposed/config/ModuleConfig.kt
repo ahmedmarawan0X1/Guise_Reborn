@@ -50,6 +50,13 @@ data class ModuleConfig(
     var passVideo: Boolean = false,
     var passAudio: Boolean = false,
     var passApplications: Boolean = false,
+    // PrivacyGuard integration: additional privacy filters.
+    var privacyBlockMedia: Boolean = false,
+    var privacyBlockCallLogs: Boolean = false,
+    var privacyBlockSms: Boolean = false,
+    var privacyBlockMms: Boolean = false,
+    var privacyBlockFiles: Boolean = false,
+    var privacyBlockedPaths: List<String> = emptyList(),
 ) {
     val isEnable: Boolean get() = enabled
 
