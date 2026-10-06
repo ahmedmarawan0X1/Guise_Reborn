@@ -2,15 +2,27 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "feature/**"
+      - "fix/**"
+      - "ci/**"
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: Test, build and lint
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -20,9 +32,23 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Test, build and lint
-        run: ./gradlew :app:testDebugUnitTest :ktx-xposed:testDebugUnitTest assembleDebug lintDebug
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :ktx-xposed:testDebugUnitTest assembleDebug lintDebug
+
+      - name: Build release
+        if: ${{ github.event_name != 'pull_request' }}
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Upload release APK
+        if: ${{ success() && github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: guise-release-${{ github.sha }}
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
