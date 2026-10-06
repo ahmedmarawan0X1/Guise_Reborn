@@ -23,6 +23,7 @@ internal enum class HookFeature {
     BLANK_PASS,
     APPLICATION_LIST,
     APP_VERSION,
+    PRIVACY_GUARD,
 }
 
 internal fun ModuleConfig.activeHookFeatures(): List<HookFeature> = buildList {
@@ -72,4 +73,7 @@ internal fun ModuleConfig.activeHookFeatures(): List<HookFeature> = buildList {
     if (passAudio || passVideo || passPhoto || passContacts) add(HookFeature.BLANK_PASS)
     if (passApplications) add(HookFeature.APPLICATION_LIST)
     if (versionName.isNotBlank() || versionCode != -1) add(HookFeature.APP_VERSION)
+    if (privacyBlockMedia || privacyBlockCallLogs || privacyBlockSms || privacyBlockMms || privacyBlockFiles || privacyBlockedPaths.any { it.isNotBlank() }) {
+        add(HookFeature.PRIVACY_GUARD)
+    }
 }

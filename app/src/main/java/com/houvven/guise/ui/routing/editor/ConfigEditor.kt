@@ -324,6 +324,39 @@ private fun ConfigEditorItems(state: ModuleConfigState, launch: () -> Unit) {
     )
 
 
+    Title(text = "Privacy Guard")
+    ContainerSwitch(
+        state.privacyBlockMedia,
+        "Block media access",
+        supportingText = "Hide media-provider results and common shared-storage media paths",
+    )
+    ContainerSwitch(
+        state.privacyBlockCallLogs,
+        "Block call logs",
+        supportingText = "Return empty call-log queries",
+    )
+    ContainerSwitch(
+        state.privacyBlockSms,
+        "Block SMS",
+        supportingText = "Return empty SMS/telephony queries",
+    )
+    ContainerSwitch(
+        state.privacyBlockMms,
+        "Block MMS",
+        supportingText = "Return empty MMS queries",
+    )
+    ContainerSwitch(
+        state.privacyBlockFiles,
+        "Block selected files",
+        supportingText = "Block direct filesystem access under the paths listed below",
+    )
+    InputBox(
+        state.privacyBlockedPaths,
+        "Blocked paths",
+        supportingText = "One absolute path per line, for example /storage/emulated/0/Private",
+    )
+
+
     // bottom blank 底部留白
     Spacer(modifier = Modifier.height(50.dp))
 }
